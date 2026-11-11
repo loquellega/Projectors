@@ -23,6 +23,26 @@ Fine-tune the vertical and horizontal position of your projection without moving
 Load your own images or videos and set custom resolutions to match your projection content.
 ![Image Texture & Resolutions](/.github/gifs/image_textures_resolution.gif)
 
+#### Image Mapping (corner pin, transform, crop)
+Map the projected image onto your set the way a media server would, directly in Blender.
+Find it in the **Image Mapping** sub-panel of the Projector panel.
+
+* **Corner Pin / keystone** – move the four corners of the image inside the projector frame
+  (normalized coordinates, `0,0` is bottom-left of the frame and `1,1` top-right).
+  * **Pin Corners to Face** – select the projector and a mesh, and the four corners snap to the
+    selected quad face (or the first quad of the mesh). The image lands exactly on that surface.
+  * **Pin Corner to 3D Cursor** – snap the 3D cursor to a vertex of your set and pin the active corner there.
+  * **Nudge** – move the active corner by projector pixels for fine adjustment.
+* **Transform** – offset, uniform/non-uniform scale, rotation (aspect-correct) and flip of the
+  image inside the pinned area. Anything outside is black.
+* **Crop** – use only a region of the source image (left/right/top/bottom %), handy for splitting
+  one piece of content across several projectors.
+
+![Mapping tests](/docs/capturas/01-mapping-pruebas.png)
+
+Works with the checker, color grid and custom image/movie modes. Projectors created with older
+versions of the add-on are upgraded automatically the first time a mapping value changes.
+
 #### Random Color
 Quickly assign random colors to distinguish multiple projectors in your scene.
 ![Random Color](/.github/gifs/random_color.gif)
@@ -44,3 +64,12 @@ Quickly assign random colors to distinguish multiple projectors in your scene.
 I'm interested and open to suggestions. Let me know how you use the add-on and how it could improve. Open an issue or message me.
 
 P.S. Germans like to call a projector, a beamer.
+
+## Créditos / Credits
+Projector add-on: Jonas Schell (Ocupe) — https://github.com/Ocupe/Projectors
+
+Image mapping (corner pin, transform, crop):  
+Diseño, investigación y desarrollo: Héctor Cruz Juárez — https://hectorcruz.com.mx  
+Colección Alchemy of Meaning.
+
+License: GPL-3.0-or-later (same as the original add-on).

@@ -91,6 +91,114 @@ class PROJECTOR_PT_projected_color(Panel):
                      icon='MODIFIER_ON', text='Random Color')
 
 
+class PROJECTOR_PT_mapping(Panel):
+    bl_label = "Image Mapping"
+    bl_parent_id = "OBJECT_PT_projector_n_panel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+
+    @classmethod
+    def poll(cls, context):
+        return len(get_projectors(context, only_selected=True)) == 1
+
+    def draw_header(self, context):
+        ms = get_projectors(context, only_selected=True)[0].proj_settings.mapping
+        self.layout.prop(ms, 'enabled', text='')
+
+    def draw(self, context):
+        projector = get_projectors(context, only_selected=True)[0]
+        ms = projector.proj_settings.mapping
+        layout = self.layout
+        layout.use_property_decorate = False
+        layout.active = ms.enabled
+        layout.operator('projector.mapping_reset', icon='LOOP_BACK', text='Reset All').section = 'ALL'
+
+
+class PROJECTOR_PT_mapping_corners(Panel):
+    bl_label = "Corner Pin"
+    bl_parent_id = "PROJECTOR_PT_mapping"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+
+    def draw(self, context):
+        projector = get_projectors(context, only_selected=True)[0]
+        ms = projector.proj_settings.mapping
+        layout = self.layout
+        layout.use_property_decorate = False
+        layout.active = ms.enabled
+
+        grid = layout.grid_flow(row_major=True, columns=2, even_columns=True, align=False)
+        for key, label in (('corner_tl', 'Top Left'), ('corner_tr', 'Top Right'),
+                           ('corner_bl', 'Bottom Left'), ('corner_br', 'Bottom Right')):
+            col = grid.column(align=True)
+            col.label(text=label)
+            col.prop(ms, key, text='')
+
+        box = layout.box()
+        box.label(text='Pin Tools', icon='PIVOT_CURSOR')
+        box.row().prop(ms, 'active_corner', expand=True)
+        box.operator('projector.corner_to_cursor', icon='CURSOR')
+        row = box.row(align=True)
+        row.operator('projector.corner_nudge', text='', icon='TRIA_LEFT').direction = 'LEFT'
+        row.operator('projector.corner_nudge', text='', icon='TRIA_DOWN').direction = 'DOWN'
+        row.operator('projector.corner_nudge', text='', icon='TRIA_UP').direction = 'UP'
+        row.operator('projector.corner_nudge', text='', icon='TRIA_RIGHT').direction = 'RIGHT'
+        row.prop(ms, 'nudge_step', text='px')
+        box.operator('projector.corners_to_face', icon='FACESEL')
+        box.label(text='Select projector + mesh (selected quad face).', icon='INFO')
+
+        layout.operator('projector.mapping_reset', text='Reset Corners').section = 'CORNERS'
+
+
+class PROJECTOR_PT_mapping_transform(Panel):
+    bl_label = "Transform"
+    bl_parent_id = "PROJECTOR_PT_mapping"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+
+    def draw(self, context):
+        ms = get_projectors(context, only_selected=True)[0].proj_settings.mapping
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+        layout.active = ms.enabled
+        col = layout.column(align=True)
+        col.prop(ms, 'offset')
+        col = layout.column(align=True)
+        col.prop(ms, 'scale_uniform')
+        col.prop(ms, 'scale')
+        layout.prop(ms, 'rotation')
+        row = layout.row(align=True)
+        row.prop(ms, 'flip_x', toggle=True)
+        row.prop(ms, 'flip_y', toggle=True)
+        layout.operator('projector.mapping_reset', text='Reset Transform').section = 'TRANSFORM'
+
+
+class PROJECTOR_PT_mapping_crop(Panel):
+    bl_label = "Crop"
+    bl_parent_id = "PROJECTOR_PT_mapping"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        ms = get_projectors(context, only_selected=True)[0].proj_settings.mapping
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+        layout.active = ms.enabled
+        col = layout.column(align=True)
+        col.prop(ms, 'crop_left')
+        col.prop(ms, 'crop_right')
+        col.prop(ms, 'crop_top')
+        col.prop(ms, 'crop_bottom')
+        layout.operator('projector.mapping_reset', text='Reset Crop').section = 'CROP'
+
+
+MAPPING_PANELS = (PROJECTOR_PT_mapping, PROJECTOR_PT_mapping_corners,
+                  PROJECTOR_PT_mapping_transform, PROJECTOR_PT_mapping_crop)
+
+
 def append_to_add_menu(self, context):
     self.layout.operator('projector.create',
                          text='Projector', icon='CAMERA_DATA')
@@ -99,6 +207,8 @@ def append_to_add_menu(self, context):
 def register():
     bpy.utils.register_class(PROJECTOR_PT_projector_settings)
     bpy.utils.register_class(PROJECTOR_PT_projected_color)
+    for cls in MAPPING_PANELS:
+        bpy.utils.register_class(cls)
     # Register create  in the blender add menu.
     bpy.types.VIEW3D_MT_light_add.append(append_to_add_menu)
 
@@ -106,5 +216,7 @@ def register():
 def unregister():
     # Register create in the blender add menu.
     bpy.types.VIEW3D_MT_light_add.remove(append_to_add_menu)
+    for cls in reversed(MAPPING_PANELS):
+        bpy.utils.unregister_class(cls)
     bpy.utils.unregister_class(PROJECTOR_PT_projected_color)
     bpy.utils.unregister_class(PROJECTOR_PT_projector_settings)

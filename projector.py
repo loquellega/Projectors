@@ -6,6 +6,7 @@ from enum import Enum
 import bpy
 from bpy.types import Operator
 
+from . import mapping
 from .helper import (ADDON_ID, auto_offset,
                      get_projectors, get_projector, random_color)
 
@@ -253,7 +254,7 @@ def get_resolution(proj_settings, context):
     Resolution from the dropdown or the resolution from the custom texture.
     """
     if proj_settings.use_custom_texture_res and proj_settings.projected_texture == Textures.CUSTOM_TEXTURE.value:
-        projector = get_projector(context)
+        projector = proj_settings.id_data
         root_tree = projector.children[0].data.node_tree
         image = root_tree.nodes['Image Texture'].image
         if image:
@@ -267,11 +268,23 @@ def get_resolution(proj_settings, context):
     return float(w), float(h)
 
 
+def get_resolution_for(projector):
+    """ Like get_resolution, but for a given projector instead of the selection. """
+    ps = projector.proj_settings
+    if ps.use_custom_texture_res and ps.projected_texture == Textures.CUSTOM_TEXTURE.value:
+        image = projector.children[0].data.node_tree.nodes['Image Texture'].image
+        if image and image.size[0] and image.size[1]:
+            return float(image.size[0]), float(image.size[1])
+        return 300.0, 300.0
+    w, h = ps.resolution.split('x')
+    return float(w), float(h)
+
+
 def update_throw_ratio(proj_settings, context):
     """
     Adjust some settings on a camera to achieve a throw ratio
     """
-    projector = get_projector(context)
+    projector = proj_settings.id_data
     # Update properties of the camera.
     throw_ratio = proj_settings.get('throw_ratio')
     distance = 1
@@ -310,7 +323,7 @@ def update_lens_shift(proj_settings, context):
     """
     Apply the shift to the camera and texture.
     """
-    projector = get_projector(context)
+    projector = proj_settings.id_data
     h_shift = proj_settings.get('h_shift', 0.0) / 100
     v_shift = proj_settings.get('v_shift', 0.0) / 100
     throw_ratio = proj_settings.get('throw_ratio')
@@ -333,9 +346,12 @@ def update_lens_shift(proj_settings, context):
         nodes['Mapping.001'].inputs[1].default_value[0] = h_shift / throw_ratio
         nodes['Mapping.001'].inputs[1].default_value[1] = v_shift / throw_ratio * inverted_aspect_ratio
 
+    # Aspect ratio may have changed: refresh the image mapping.
+    mapping.apply_mapping(projector)
+
 
 def update_resolution(proj_settings, context):
-    projector = get_projector(context)
+    projector = proj_settings.id_data
     nodes = projector.children[0].data.node_tree.nodes['Group'].node_tree.nodes
     # Change resolution image texture
     nodes['Image Texture'].image = bpy.data.images[f'_proj.tex.{proj_settings.resolution}']
@@ -345,21 +361,20 @@ def update_resolution(proj_settings, context):
 
 def update_checker_color(proj_settings, context):
     # Update checker texture color
-    nodes = get_projector(
-        context).children[0].data.node_tree.nodes['Group'].node_tree.nodes
+    nodes = proj_settings.id_data.children[0].data.node_tree.nodes['Group'].node_tree.nodes
     c = proj_settings.projected_color
     nodes['Checker Texture'].inputs['Color2'].default_value = [c.r, c.g, c.b, 1]
 
 
 def update_power(proj_settings, context):
     # Update spotlight power
-    spot = get_projector(context).children[0]
+    spot = proj_settings.id_data.children[0]
     spot.data.energy = proj_settings["power"]
 
 
 def update_pixel_grid(proj_settings, context):
     """ Update the pixel grid. Meaning, make it visible by linking the right node and updating the resolution. """
-    root_tree = get_projector(context).children[0].data.node_tree
+    root_tree = proj_settings.id_data.children[0].data.node_tree
     nodes = root_tree.nodes
     pixel_grid_nodes = nodes['pixel_grid'].node_tree.nodes
     width, height = get_resolution(proj_settings, context)
@@ -514,6 +529,9 @@ def create_projector(context):
     # Parent light to cam.
     spot.parent = cam
 
+    # Insert the image mapping chain (corner pin / transform / crop).
+    mapping.ensure_mapping_nodes(cam)
+
     # Move newly create projector (cam and spotlight) to 3D-Cursor position.
     cam.location = context.scene.cursor.location
     cam.rotation_euler = context.scene.cursor.rotation_euler
@@ -559,7 +577,7 @@ class PROJECTOR_OT_create_projector(Operator):
 
 def update_projected_texture(proj_settings, context):
     """ Update the projected output source. """
-    projector = get_projectors(context, only_selected=True)[0]
+    projector = proj_settings.id_data
     root_tree = projector.children[0].data.node_tree
     group_tree = root_tree.nodes['Group'].node_tree
     group_output_node = group_tree.nodes['Group Output']
@@ -649,9 +667,11 @@ class ProjectorSettings(bpy.types.PropertyGroup):
         description="When checked the image is divided into a pixel grid with the dimensions of the image resolution.",
         default=False,
         update=update_pixel_grid)
+    mapping: bpy.props.PointerProperty(type=mapping.ProjectorMappingSettings)
 
 
 def register():
+    bpy.utils.register_class(mapping.ProjectorMappingSettings)
     bpy.utils.register_class(ProjectorSettings)
     bpy.utils.register_class(PROJECTOR_OT_create_projector)
     bpy.utils.register_class(PROJECTOR_OT_delete_projector)
@@ -665,3 +685,4 @@ def unregister():
     bpy.utils.unregister_class(PROJECTOR_OT_delete_projector)
     bpy.utils.unregister_class(PROJECTOR_OT_create_projector)
     bpy.utils.unregister_class(ProjectorSettings)
+    bpy.utils.unregister_class(mapping.ProjectorMappingSettings)
